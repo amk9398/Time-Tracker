@@ -47,6 +47,10 @@ public class Task {
     public double getDuration() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
 
+        if (startTime.get() == null || endTime.get() == null) {
+            return 0;
+        }
+
         String startTime = this.startTime.get();
         if (startTime.length() == 4) {
             startTime = "0" + startTime;

@@ -9,24 +9,23 @@ import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
+import javafx.util.converter.FormatStringConverter;
 
 import java.io.*;
 import java.net.URL;
+import java.text.Format;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ResourceBundle;
+import java.util.*;
 
 public class MainLayout implements Initializable {
     @FXML TableView<Task> tableView;
@@ -36,12 +35,9 @@ public class MainLayout implements Initializable {
     @FXML TableColumn<Task, String> descriptionColumn;
     @FXML TableColumn<Task, String> chargeCodeColumn;
     @FXML ProgressBar progressBar;
+    @FXML Label progressLabel;
 
-    public double NUMBER_WIDTH_PCT = .10;
-    public double START_TIME_WIDTH_PCT = .15;
-    public double END_TIME_WIDTH_PCT = .15;
-    public double DESCRIPTION_WIDTH_PCT = .45;
-    public double CHARGE_CODE_WIDTH_PCT = .15;
+    private TableCell<Task, String> editingCell;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -55,25 +51,34 @@ public class MainLayout implements Initializable {
                 setProgress();
             }
         });
+//        tableView.setOnMouseClicked(event -> {
+//            if (editingCell != null) {
+//                if (event.getTarget() instanceof TableCell<?, ?> clickedCell) {
+//                    if (clickedCell != editingCell) {
+//                        tableView.edit(-1, null);
+//                        editingCell = null;
+//                    }
+//                } else {
+//                    tableView.edit(-1, null);
+//                    editingCell = null;
+//                }
+//            }
+//        });
 
         numberColumn.setCellValueFactory(new PropertyValueFactory<>("number"));
-//        numberColumn.setPrefWidth(tableView.getWidth() * START_TIME_WIDTH_PCT);
 
         startTimeColumn.setCellValueFactory(new PropertyValueFactory<>("startTime"));
         startTimeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-//        startTimeColumn.setPrefWidth(tableView.getWidth() * START_TIME_WIDTH_PCT);
 
         endTimeColumn.setCellValueFactory(new PropertyValueFactory<>("endTime"));
         endTimeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-//        endTimeColumn.setPrefWidth(tableView.getWidth() * END_TIME_WIDTH_PCT);
 
         descriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
         descriptionColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-//        descriptionColumn.setPrefWidth(tableView.getWidth() * DESCRIPTION_WIDTH_PCT);
+        enableTextWrapping(descriptionColumn);
 
         chargeCodeColumn.setCellValueFactory(new PropertyValueFactory<>("chargeCode"));
         chargeCodeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-//        chargeCodeColumn.setPrefWidth(tableView.getWidth() * CHARGE_CODE_WIDTH_PCT);
 
         progressBar.setPrefWidth(tableView.getWidth());
 
@@ -367,5 +372,69 @@ public class MainLayout implements Initializable {
         }
 
         progressBar.setProgress(totalDuration / 480);
+        progressLabel.setText(String.format("%.2f", totalDuration) + " / " + 480);
+    }
+
+    private Map<String, Double> generateChargeCodeReport() {
+        Map<String, Double> hours = new HashMap<>();
+        hours.put("Uncategorized", 0.0);
+
+        for (Task task : tableView.getItems()) {
+            if (task.getChargeCode().isBlank()) {
+                hours.compute("Uncategorized", (k, uncategorized) -> uncategorized + task.getDuration());
+            } else if (hours.containsKey(task.getChargeCode())) {
+                hours.compute(task.getChargeCode(), (k, num) -> num + task.getDuration());
+            } else {
+                hours.put(task.getChargeCode(), task.getDuration());
+            }
+        }
+
+        return hours;
+    }
+
+    public void onGenerateReport() {
+        Stage aboutStage = new Stage();
+        aboutStage.setTitle("Charge Code Report");
+
+        VBox reportLayout = new VBox(10);
+        reportLayout.setPadding(new Insets(10));
+        reportLayout.setAlignment(Pos.CENTER);
+
+        Map<String, Double> report = generateChargeCodeReport();
+        for (String key : report.keySet()) {
+            String hours = String.format("%.2f", report.get(key) / 60);
+            Label label = new Label(key + ": " + hours + " hours");
+            reportLayout.getChildren().add(label);
+        }
+
+        Scene aboutScene = new Scene(reportLayout, 300, 200);
+        aboutStage.setScene(aboutScene);
+        aboutStage.initModality(Modality.APPLICATION_MODAL);
+        aboutStage.show();
+    }
+
+    private void enableTextWrapping(TableColumn<Task, String> column) {
+        column.setCellFactory(param -> new TableCell<>() {
+            private final Text text;
+
+            {
+                text = new Text();
+                text.wrappingWidthProperty().bind(param.widthProperty()); // Bind text wrapping to column width
+                text.setStyle("-fx-padding: 5;"); // Optional: Add padding around text
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    text.setText(item);
+                    setGraphic(text);
+                    setText(null);
+                }
+            }
+        });
     }
 }
