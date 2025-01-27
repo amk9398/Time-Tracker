@@ -1,9 +1,9 @@
 package com.aaronkersten.timetracker.controller;
 
+import com.aaronkersten.timetracker.EditingCell;
+import com.aaronkersten.timetracker.FileUtils;
 import com.aaronkersten.timetracker.Task;
 import com.aaronkersten.timetracker.TimeTrackerApplication;
-import javafx.collections.ListChangeListener;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -11,18 +11,14 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import javafx.util.StringConverter;
-import javafx.util.converter.FormatStringConverter;
+import javafx.util.Callback;
 
 import java.io.*;
 import java.net.URL;
-import java.text.Format;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -37,158 +33,39 @@ public class MainLayout implements Initializable {
     @FXML ProgressBar progressBar;
     @FXML Label progressLabel;
 
-    private TableCell<Task, String> editingCell;
-
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         tableView.setEditable(true);
+
+        // adjust progress bar width
         tableView.widthProperty().addListener((observableValue, oldWidth, newWidth) -> {
             progressBar.setPrefWidth((Double) newWidth);
         });
-        tableView.getItems().addListener(new ListChangeListener<Task>() {
-            @Override
-            public void onChanged(Change<? extends Task> change) {
-                setProgress();
+
+        // TODO
+        tableView.setOnMouseClicked(event -> {
+            if (event.getTarget() instanceof TableCell<?,?> clickedCell) {
+                tableView.edit(clickedCell.getTableRow().getIndex(), (TableColumn<Task, ?>) clickedCell.getTableColumn());
             }
         });
-//        tableView.setOnMouseClicked(event -> {
-//            if (editingCell != null) {
-//                if (event.getTarget() instanceof TableCell<?, ?> clickedCell) {
-//                    if (clickedCell != editingCell) {
-//                        tableView.edit(-1, null);
-//                        editingCell = null;
-//                    }
-//                } else {
-//                    tableView.edit(-1, null);
-//                    editingCell = null;
-//                }
-//            }
-//        });
 
+        // columns
         numberColumn.setCellValueFactory(new PropertyValueFactory<>("number"));
 
         startTimeColumn.setCellValueFactory(new PropertyValueFactory<>("startTime"));
-        startTimeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+        startTimeColumn.setCellFactory(getCellFactory());
 
         endTimeColumn.setCellValueFactory(new PropertyValueFactory<>("endTime"));
-        endTimeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+        endTimeColumn.setCellFactory(getCellFactory());
 
         descriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
-        descriptionColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-        enableTextWrapping(descriptionColumn);
+        descriptionColumn.setCellFactory(getCellFactory());
 
         chargeCodeColumn.setCellValueFactory(new PropertyValueFactory<>("chargeCode"));
-        chargeCodeColumn.setCellFactory(TextFieldTableCell.forTableColumn());
-
-        progressBar.setPrefWidth(tableView.getWidth());
-
-        addTask("9:00", "", "", "");
+        chargeCodeColumn.setCellFactory(getCellFactory());
 
         setColumnWidths();
-    }
-
-    public void onNewFile() {
-        try {
-            new TimeTrackerApplication().start(new Stage());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void onOpenFile(ActionEvent event) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Open Time Tracker File");
-        fileChooser.setInitialDirectory(new File("Time Sheets"));
-
-        FileChooser.ExtensionFilter csvFilter = new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv");
-        FileChooser.ExtensionFilter txtFilter = new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt");
-        fileChooser.getExtensionFilters().addAll(csvFilter, txtFilter);
-
-        File selectedFile = fileChooser.showOpenDialog(tableView.getScene().getWindow());
-        if (selectedFile != null) {
-            readFile(selectedFile);
-        }
-    }
-
-    public void onSave(ActionEvent event) {
-        try {
-            File directory = new File("Time Sheets");
-            if (!directory.exists()) {
-                if (directory.mkdir()) {
-                    System.out.println("Directory 'Time Sheets' created.");
-                } else {
-                    System.err.println("Failed to create 'Time Sheets' directory.");
-                    return;
-                }
-            }
-
-            LocalDate currentDate = LocalDate.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
-            String fileName = "Time Sheets/timesheet-" + currentDate.format(formatter) + ".csv";
-
-            try (FileWriter writer = new FileWriter(fileName)) {
-                for (TableColumn<Task, ?> column : tableView.getColumns()) {
-                    writer.write(column.getText() + ",");
-                }
-                writer.write("\n");
-
-                for (Task task : tableView.getItems()) {
-                    writer.write(escapeForCSV(task.getStartTime()) + ",");
-                    writer.write(escapeForCSV(task.getEndTime()) + ",");
-                    writer.write(escapeForCSV(task.getDescription()) + ",");
-                    writer.write(escapeForCSV(task.getChargeCode()) + "\n");
-                }
-
-                System.out.println("Data exported to " + fileName);
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    public void onSaveAs(ActionEvent event) {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Save As");
-        fileChooser.setInitialDirectory(new File("Time Sheets"));
-
-        LocalDate currentDate = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
-        String fileName = "Time Sheets/timesheet-" + currentDate.format(formatter) + ".csv";
-        fileChooser.setInitialFileName(fileName);
-
-        FileChooser.ExtensionFilter csvFilter = new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv");
-        FileChooser.ExtensionFilter txtFilter = new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt");
-        fileChooser.getExtensionFilters().addAll(csvFilter, txtFilter);
-
-        File file = fileChooser.showSaveDialog(tableView.getScene().getWindow());
-
-        if (file != null) {
-            try (FileWriter writer = new FileWriter(file)) {
-                for (TableColumn<Task, ?> column : tableView.getColumns()) {
-                    writer.write(column.getText() + ",");
-                }
-                writer.write("\n");
-
-                for (Task task : tableView.getItems()) {
-                    writer.write(escapeForCSV(task.getStartTime()) + ",");
-                    writer.write(escapeForCSV(task.getEndTime()) + ",");
-                    writer.write(escapeForCSV(task.getDescription()) + ",");
-                    writer.write(escapeForCSV(task.getChargeCode()) + "\n");
-                }
-
-                System.out.println("Data exported to " + fileName);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void onCloseWindow() {
-        ((Stage) tableView.getScene().getWindow()).close();
-    }
-
-    public void onExit() {
-        System.exit(0);
+        loadFile();
     }
 
     public void onAbout() {
@@ -206,6 +83,20 @@ public class MainLayout implements Initializable {
         aboutStage.setScene(aboutScene);
         aboutStage.initModality(Modality.APPLICATION_MODAL);
         aboutStage.show();
+    }
+
+    public void onCloseWindow() {
+        ((Stage) tableView.getScene().getWindow()).close();
+    }
+
+    public void onDeleteTask() {
+        Task task = tableView.getSelectionModel().getSelectedItem();
+        tableView.getItems().remove(task);
+
+        // reset numbers for each task
+        for (int i = 0; i < tableView.getItems().size(); i++ ) {
+            tableView.getItems().get(i).setNumber(i + 1);
+        }
     }
 
     public void onEditStartTime(TableColumn.CellEditEvent<Task, String> event) {
@@ -230,13 +121,46 @@ public class MainLayout implements Initializable {
         selectedTask.setChargeCode(event.getNewValue());
     }
 
+    public void onExit() {
+        System.exit(0);
+    }
+
+    public void onGenerateReport() {
+        Stage reportStage = new Stage();
+        reportStage.setTitle("Charge Code Report");
+
+        VBox reportLayout = new VBox(10);
+        reportLayout.setPadding(new Insets(10));
+        reportLayout.setAlignment(Pos.CENTER);
+
+        Map<String, Double> report = generateChargeCodeReport();
+        for (String key : report.keySet()) {
+            String hours = String.format("%.2f", report.get(key) / 60);
+            Label label = new Label(key + ": " + hours + " hours");
+            reportLayout.getChildren().add(label);
+        }
+
+        Scene aboutScene = new Scene(reportLayout, 300, 200);
+        reportStage.setScene(aboutScene);
+        reportStage.initModality(Modality.APPLICATION_MODAL);
+        reportStage.show();
+    }
+
+    public void onNewFile() {
+        try {
+            new TimeTrackerApplication().start(new Stage());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void onNewTask() {
         String startTime = "";
 
         if (!tableView.getItems().isEmpty()) {
             Task lastTask = tableView.getItems().get(tableView.getItems().size() - 1);
 
-            if (!lastTask.getEndTime().isEmpty()) {
+            if (!lastTask.getEndTime().isBlank()) {
                 startTime = lastTask.getEndTime();
             }
         }
@@ -244,135 +168,55 @@ public class MainLayout implements Initializable {
         addTask(startTime, "", "", "");
     }
 
-    public void onDeleteTask() {
-        Task task = tableView.getSelectionModel().getSelectedItem();
-        tableView.getItems().remove(task);
+    public void onOpenFile() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Open Time Tracker File");
+        fileChooser.setInitialDirectory(new File("Time Sheets"));
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"),
+                new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt")
+        );
 
-        for (int i = 0; i < tableView.getItems().size(); i++ ) {
-            tableView.getItems().get(i).setNumber(i + 1);
+        File selectedFile = fileChooser.showOpenDialog(getStage());
+        if (selectedFile != null) {
+            tableView.getItems().clear();
+            tableView.getItems().addAll(FileUtils.readFile(selectedFile));
         }
     }
 
-    private String escapeForCSV(String field) {
-        if (field == null) {
-            return "";
-        }
-
-        String escaped = field.replace("\"", "\"\"");
-        if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n")) {
-            return "\"" + escaped + "\"";
-        }
-
-        return escaped;
-    }
-
-    private void readFile(File file) {
-        tableView.getItems().clear();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            boolean skipHeader = true;
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                if (skipHeader) {
-                    skipHeader = false;
-                    continue;
-                }
-
-                List<String> fields = parseLine(line);
-
-                System.out.println(fields);
-                addTask(fields.get(0), fields.get(1), fields.get(2), fields.get(3));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
-    }
-
-    private static List<String> parseLine(String line) {
-        List<String> fields = new ArrayList<>();
-        StringBuilder field = new StringBuilder();
-        boolean inQuotes = false;
-
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-
-            if (inQuotes) {
-                if (c == '"') {
-                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') {
-                        field.append('"');
-                        i++;
-                    } else {
-                        inQuotes = false;
-                    }
-                } else {
-                    field.append(c);
-                }
-            } else {
-                if (c == '"') {
-                    inQuotes = true;
-                } else if (c == ',') {
-                    fields.add(field.toString());
-                    field.setLength(0);
-                } else {
-                    field.append(c);
-                }
+    public void onSave() {
+        File directory = new File("Time Sheets");
+        if (!directory.exists()) {
+            if (!directory.mkdir()) {
+                System.err.println("Failed to create 'Time Sheets' directory");
             }
         }
 
-        fields.add(field.toString());
-        return fields;
+        List<String> headers = tableView.getColumns().stream().map(TableColumnBase::getText).toList();
+        FileUtils.writeFile(new File("Time Sheets/" + getFilename()), headers, tableView.getItems());
+    }
+
+    public void onSaveAs() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save As");
+        fileChooser.setInitialDirectory(new File("Time Sheets"));
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"),
+                new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt")
+        );
+        fileChooser.setInitialFileName(getFilename());
+
+        File file = fileChooser.showSaveDialog(getStage());
+        if (file != null) {
+            List<String> headers = tableView.getColumns().stream().map(TableColumnBase::getText).toList();
+            FileUtils.writeFile(file, headers, tableView.getItems());
+        }
     }
 
     private void addTask(String startTime, String endTime, String description, String chargeCode) {
         int size = tableView.getItems().size();
         Task task = new Task(size + 1, startTime, endTime, description, chargeCode);
         tableView.getItems().add(task);
-    }
-
-    private void resizeColumnToFitContent(TableColumn<Task, String> column) {
-        double maxWidth = getMaxWidth(column);
-        column.setPrefWidth(maxWidth + 20);
-    }
-
-    private double getMaxWidth(TableColumn<Task, String> column) {
-        double maxWidth = column.getText().length() * 7; // Estimate column header width (adjust as needed)
-
-        for (Task task : column.getTableView().getItems()) {
-            double width = column.getCellData(task).length() * 7;
-            maxWidth = Math.max(maxWidth, width);
-        }
-
-        return maxWidth;
-    }
-
-    private void setColumnWidths() {
-        double maxWidth = numberColumn.getText().length() * 7;
-        for (Task task : tableView.getItems()) {
-            double width = String.valueOf(task.getNumber()).length() * 7;
-            maxWidth = Math.max(maxWidth, width);
-        }
-        numberColumn.setPrefWidth(maxWidth + 20);
-
-        resizeColumnToFitContent(startTimeColumn);
-        resizeColumnToFitContent(endTimeColumn);
-        resizeColumnToFitContent(descriptionColumn);
-        resizeColumnToFitContent(chargeCodeColumn);
-
-        descriptionColumn.prefWidthProperty().bind(tableView.widthProperty().subtract(
-                numberColumn.getWidth() + startTimeColumn.getWidth() + endTimeColumn.getWidth() + chargeCodeColumn.getWidth()
-        ));
-    }
-
-    private void setProgress() {
-        double totalDuration = 0;
-        for (Task task : tableView.getItems()) {
-            totalDuration += task.getDuration();
-        }
-
-        progressBar.setProgress(totalDuration / 480);
-        progressLabel.setText(String.format("%.2f", totalDuration) + " / " + 480);
     }
 
     private Map<String, Double> generateChargeCodeReport() {
@@ -392,49 +236,81 @@ public class MainLayout implements Initializable {
         return hours;
     }
 
-    public void onGenerateReport() {
-        Stage aboutStage = new Stage();
-        aboutStage.setTitle("Charge Code Report");
-
-        VBox reportLayout = new VBox(10);
-        reportLayout.setPadding(new Insets(10));
-        reportLayout.setAlignment(Pos.CENTER);
-
-        Map<String, Double> report = generateChargeCodeReport();
-        for (String key : report.keySet()) {
-            String hours = String.format("%.2f", report.get(key) / 60);
-            Label label = new Label(key + ": " + hours + " hours");
-            reportLayout.getChildren().add(label);
-        }
-
-        Scene aboutScene = new Scene(reportLayout, 300, 200);
-        aboutStage.setScene(aboutScene);
-        aboutStage.initModality(Modality.APPLICATION_MODAL);
-        aboutStage.show();
+    public Callback<TableColumn<Task, String>, TableCell<Task, String>> getCellFactory() {
+        return p -> new EditingCell();
     }
 
-    private void enableTextWrapping(TableColumn<Task, String> column) {
-        column.setCellFactory(param -> new TableCell<>() {
-            private final Text text;
+    private static double getColumnMaxWidth(TableColumn<Task, String> column) {
+        double maxWidth = column.getText().length() * 7;
 
-            {
-                text = new Text();
-                text.wrappingWidthProperty().bind(param.widthProperty()); // Bind text wrapping to column width
-                text.setStyle("-fx-padding: 5;"); // Optional: Add padding around text
-            }
+        for (Task task : column.getTableView().getItems()) {
+            double width = column.getCellData(task).length() * 7;
+            maxWidth = Math.max(maxWidth, width);
+        }
 
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
-                    setText(null);
-                } else {
-                    text.setText(item);
-                    setGraphic(text);
-                    setText(null);
-                }
+        return maxWidth;
+    }
+
+    private String getFilename() {
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
+        return "timesheet-" + currentDate.format(formatter) + ".csv";
+    }
+
+    private Stage getStage() {
+        return (Stage) tableView.getScene().getWindow();
+    }
+
+    private static void resizeColumnToFitContent(TableColumn<Task, String> column) {
+        double maxWidth = getColumnMaxWidth(column);
+        column.setPrefWidth(maxWidth + 20);
+    }
+
+    private void loadFile() {
+        File directory = new File("Time Sheets");
+        if (directory.exists()) {
+            File file = new File("Time Sheets/" + getFilename());
+            if (file.exists()) {
+                tableView.getItems().clear();
+                tableView.getItems().addAll(FileUtils.readFile(file));
+            } else {
+                addTask("9:00", "", "", "");
+                onSave();
             }
-        });
+        }
+    }
+
+    private void setColumnWidths() {
+        // have to set number column width separately
+        double maxWidth = numberColumn.getText().length() * 7;
+        for (Task task : tableView.getItems()) {
+            double width = String.valueOf(task.getNumber()).length() * 7;
+            maxWidth = Math.max(maxWidth, width);
+        }
+        numberColumn.setPrefWidth(maxWidth + 20);
+
+        resizeColumnToFitContent(startTimeColumn);
+        resizeColumnToFitContent(endTimeColumn);
+        resizeColumnToFitContent(descriptionColumn);
+        resizeColumnToFitContent(chargeCodeColumn);
+
+        double otherColWidths = numberColumn.getWidth()
+                + startTimeColumn.getWidth()
+                + endTimeColumn.getWidth()
+                + chargeCodeColumn.getWidth();
+
+        descriptionColumn.prefWidthProperty()
+                .bind(tableView.widthProperty().subtract(otherColWidths));
+    }
+
+    private void setProgress() {
+        double totalDuration = 0;
+        for (Task task : tableView.getItems()) {
+            totalDuration += task.getDuration();
+        }
+
+        progressBar.setProgress(totalDuration / 480);
+        progressLabel.setText(String.format("%.2f", totalDuration) + " / " + 480
+                + " (" + String.format("%.2f", 100 * totalDuration / 480) + "%)");
     }
 }

@@ -89,9 +89,4 @@ public class Task {
     public void setChargeCode(String chargeCode) {
         this.chargeCode = new SimpleStringProperty(chargeCode);
     }
-
-    @Override
-    public String toString() {
-        return String.join("\t", getStartTime(), getEndTime(), getDescription(), getChargeCode());
-    }
 }

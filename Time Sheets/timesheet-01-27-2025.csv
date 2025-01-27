@@ -1,0 +1,13 @@
+#,Start Time,End Time,Description,Charge Code,
+10:00,10:25,,Admin
+10:25,10:40,TUAS-1776,Darkhive
+10:40,11:00,Watch video from Mark / Misc.,Admin
+11:00,12:00,Stand-up meeting,Admin
+12:00,12:15,Time Tracker,Admin
+12:15,13:30,Send new build to Darkhive,Darkhive
+14:45,15:00,Lunch,
+15:05,15:40,Send new build to Darkhive,Darkhive
+15:40,15:55,Review MRs (TUAS-1750),Admin
+15:55,16:00,,Admin
+16:00,16:25,Send new build to Darkhive,Darkhive
+16:25,,TUAS-1779: review branch,UVC
