@@ -14,6 +14,8 @@ public class EditingCell extends TableCell<Task, String> {
             setText(null);
             setGraphic(textField);
             textField.selectAll();
+
+            textField.requestFocus();
         }
     }
 

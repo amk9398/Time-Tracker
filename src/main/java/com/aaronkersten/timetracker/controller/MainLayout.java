@@ -11,6 +11,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
@@ -36,16 +38,14 @@ public class MainLayout implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         tableView.setEditable(true);
-
-        // adjust progress bar width
         tableView.widthProperty().addListener((observableValue, oldWidth, newWidth) -> {
             progressBar.setPrefWidth((Double) newWidth);
         });
 
-        // TODO
-        tableView.setOnMouseClicked(event -> {
-            if (event.getTarget() instanceof TableCell<?,?> clickedCell) {
-                tableView.edit(clickedCell.getTableRow().getIndex(), (TableColumn<Task, ?>) clickedCell.getTableColumn());
+        tableView.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.TAB) {
+                System.out.println("tab");
+                event.consume();
             }
         });
 
@@ -66,6 +66,7 @@ public class MainLayout implements Initializable {
 
         setColumnWidths();
         loadFile();
+        setProgress();
     }
 
     public void onAbout() {
@@ -86,7 +87,7 @@ public class MainLayout implements Initializable {
     }
 
     public void onCloseWindow() {
-        ((Stage) tableView.getScene().getWindow()).close();
+        getStage().close();
     }
 
     public void onDeleteTask() {
@@ -261,6 +262,18 @@ public class MainLayout implements Initializable {
         return (Stage) tableView.getScene().getWindow();
     }
 
+    private void handleKeyEvent(KeyEvent event) {
+        if (event.getCode() == KeyCode.TAB) {
+            if (event.isShiftDown()) {
+                toggleHorizontalFocus(-1);
+            } else {
+                System.out.println("tab");
+                toggleHorizontalFocus(1);
+            }
+            event.consume();
+        }
+    }
+
     private static void resizeColumnToFitContent(TableColumn<Task, String> column) {
         double maxWidth = getColumnMaxWidth(column);
         column.setPrefWidth(maxWidth + 20);
@@ -312,5 +325,13 @@ public class MainLayout implements Initializable {
         progressBar.setProgress(totalDuration / 480);
         progressLabel.setText(String.format("%.2f", totalDuration) + " / " + 480
                 + " (" + String.format("%.2f", 100 * totalDuration / 480) + "%)");
+    }
+
+    private void toggleHorizontalFocus(int direction) {
+        int row = tableView.getSelectionModel().getSelectedItem().getNumber();
+        int column = tableView.getEditingCell().getColumn();
+        int newColumn = (column + direction) % tableView.getColumns().size();
+        TableColumn<Task, ?> tableColumn = tableView.getColumns().get(newColumn);
+        tableView.edit(row, tableColumn);
     }
 }

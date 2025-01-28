@@ -10,4 +10,7 @@
 15:40,15:55,Review MRs (TUAS-1750),Admin
 15:55,16:00,,Admin
 16:00,16:25,Send new build to Darkhive,Darkhive
-16:25,,TUAS-1779: review branch,UVC
+16:25,17:45,TUAS-1779: review branch,UVC
+18:10,19:10,TUAS-1779: test GroundSDK 8 on Sphinx simulator,UVC
+19:10,19:25,TUAS-1710,UVC
+19:25,19:45,Daily cleanup,Admin
